@@ -9,6 +9,9 @@ import ConfigParser
 import logging
 import colorlog
 
+import datetime
+print("now is {0}".format(datetime.datetime.now()))
+
 logger = colorlog.getLogger()
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
