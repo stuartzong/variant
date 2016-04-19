@@ -140,9 +140,9 @@ def filter_variants(variant_summary, filters, pairing,
                     except:
                         RNA_t_cov = line["t_RNA_cov"]
                     try:
-                        RNA_t_refC = int(line["t_RNA_RefC"])
+                        t_RNA_RefC = int(line["t_RNA_RefC"])
                     except:
-                        RNA_t_refC = line["t_RNA_RefC"]
+                        t_RNA_RefC = line["t_RNA_RefC"]
                     try:
                         RNA_t_altC = int(line["t_RNA_AltC"])
                     except:
@@ -151,7 +151,7 @@ def filter_variants(variant_summary, filters, pairing,
                         RNA_t_af = float(line["t_RNA_AF"])
                     except:
                         RNA_t_af = line["t_RNA_AF"]
-                    RNA_t_altref_total = RNA_t_refC + RNA_t_altC
+                    RNA_t_altref_total = t_RNA_RefC + RNA_t_altC
                     DNA_t_altref_total = DNA_t_refC + DNA_t_altC
                     """
                     content = [line[i] for i in headers]
@@ -207,7 +207,37 @@ def filter_variants(variant_summary, filters, pairing,
                                 logger.info("Only genome is sequenced for this tumor! ")
                                 if (DNA_t_cov >= DNA_t_cov_thres and DNA_t_altC >= DNA_t_altC_thres and DNA_t_af >= DNA_t_af_thres and DNA_t_altref_total >= DNA_t_percent_thres*DNA_t_cov):
                                     writer.writerow(content)
-                                    if ((DNA_n_af <= DNA_n_af_thres) or (DNA_n_altC <= DNA_n_altC_thres)):
+logger.info('Filtering variant without matching normal!')      |
+                for line in records:                                           |
+                    for key in line.keys():                                    |
+                        if is_float(line[key]):                                |
+                            line[key] = float(line[key])                       |
+                            print('is float %s' % key)                         |
+                        elif(line[key].isdigit()):                             |
+                            line[key] = int(line[key])                         |
+                    in_strelka = line["in_strelka"]                            |
+                    DNA_t_cov = line["t_DNA_cov"]                              |
+                    DNA_t_refC = line["t_DNA_RefC"]                            |
+                    DNA_t_altC = line["t_DNA_AltC"]                            |
+                    DNA_t_af = line["t_DNA_AF"]                                |
+                    RNA_t_cov = line["t_RNA_cov"]                              |
+                    RNA_t_refC = line["t_RNA_RefC"]                            |
+                    RNA_t_altC = line["t_RNA_AltC"]                            |
+                    RNA_t_af = line["t_RNA_AF"]                                |
+                    RNA_t_altref_total = RNA_t_refC + RNA_t_altC               |
+                    DNA_t_altref_total = DNA_t_refC + DNA_t_altC               |
+                    content = [line[i] for i in headers]                       |
+                    if (in_strelka == 'in_strelka'):                           |
+                        # print "in strelka, so keep this variant!"            |
+                        writer.writerow(content)                               |
+                    else:                                                      |
+                        if(DNA_t_cov == 'na'):                                 |
+                            logger.info("Only transcriptome is sequenced for this tumor! ")
+                            if(RNA_t_cov >= RNA_t_cov_thres and RNA_t_altC >= RNA_t_altC_thres and RNA_t_af >= RNA_t_af_thres and RNA_t_altref_total >= RNA_t_percent_thres*RNA_t_cov):
+                                writer.writerow(content)                       |
+                        elif(RNA_t_cov == 'na'):                               |
+                            logger.info("Only genome is sequenced for this tumor! ")
+                            # if (DNA_t_cov >= DN                                    if ((DNA_n_af <= DNA_n_af_thres) or (DNA_n_altC <= DNA_n_altC_thres)):
                                         writer2.writerow(content)
         
                             else:
@@ -229,52 +259,21 @@ def filter_variants(variant_summary, filters, pairing,
             elif (pairing == 'unpaired'):
                 logger.info('Filtering variant without matching normal!')
                 for line in records:
-                    for item in headers:
-                        if(line[item].isdigit()):
-                            print('item is:%s,%s' % (line, item))
-                            item = float(line[item])
-                        else:
-                            item = line[item]
-                    """
-                    gene = line['gene']
-                    chr = line["chromosome"]
-                    pos = line["position"]
-                    ref = line["ref_base"]
-                    alt = line["alt_base"]
+                    for key in line.keys():
+                        if is_float(line[key]):
+                            line[key] = float(line[key])
+                            print('is float %s' % key)
+                        elif(line[key].isdigit()):
+                            line[key] = int(line[key])
                     in_strelka = line["in_strelka"]
-                    try:
-                        DNA_t_cov = int(line["t_DNA_cov"])
-                    except:
-                        DNA_t_cov = line["t_DNA_cov"]
-                    try:
-                        DNA_t_refC = int(line["t_DNA_RefC"])
-                    except:
-                        DNA_t_refC = line["t_DNA_RefC"]
-                    try:
-                        DNA_t_altC = int(line["t_DNA_AltC"])
-                    except:
-                        DNA_t_altC = line["t_DNA_AltC"]
-                    try:
-                        DNA_t_af = float(line["t_DNA_AF"])
-                    except:
-                        DNA_t_af = line["t_DNA_AF"]
-                    try:
-                        RNA_t_cov = int(line["t_RNA_cov"])
-                    except:
-                        RNA_t_cov = line["t_RNA_cov"]
-                    try:
-                        RNA_t_refC = int(line["t_RNA_RefC"])
-                    except:
-                        RNA_t_refC = line["t_RNA_RefC"]
-                    try:
-                        RNA_t_altC = int(line["t_RNA_AltC"])
-                    except:
-                        RNA_t_altC = line["t_RNA_AltC"]
-                    try:
-                        RNA_t_af = float(line["t_RNA_AF"])
-                    except:
-                        RNA_t_af = line["t_RNA_AF"]
-                    """
+                    DNA_t_cov = line["t_DNA_cov"]
+                    DNA_t_refC = line["t_DNA_RefC"]
+                    DNA_t_altC = line["t_DNA_AltC"]
+                    DNA_t_af = line["t_DNA_AF"]
+                    RNA_t_cov = line["t_RNA_cov"]
+                    RNA_t_refC = line["t_RNA_RefC"]
+                    RNA_t_altC = line["t_RNA_AltC"]
+                    RNA_t_af = line["t_RNA_AF"]
                     RNA_t_altref_total = RNA_t_refC + RNA_t_altC
                     DNA_t_altref_total = DNA_t_refC + DNA_t_altC
                     content = [line[i] for i in headers]
@@ -282,21 +281,30 @@ def filter_variants(variant_summary, filters, pairing,
                         # print "in strelka, so keep this variant!"
                         writer.writerow(content)
                     else:
-                        if (DNA_t_cov == 'na'):
-                           logger.info("Only transcriptome is sequenced for this tumor! ")
-                           if (RNA_t_cov >= RNA_t_cov_thres and RNA_t_altC >= RNA_t_altC_thres and RNA_t_af >= RNA_t_af_thres and RNA_t_altref_total >= RNA_t_percent_thres*RNA_t_cov):
+                        if(DNA_t_cov == 'na'):
+                            logger.info("Only transcriptome is sequenced for this tumor! ")
+                            if(RNA_t_cov >= RNA_t_cov_thres and RNA_t_altC >= RNA_t_altC_thres and RNA_t_af >= RNA_t_af_thres and RNA_t_altref_total >= RNA_t_percent_thres*RNA_t_cov):
                                 writer.writerow(content)
-                        elif (RNA_t_cov == 'na'):
+                        elif(RNA_t_cov == 'na'):
                             logger.info("Only genome is sequenced for this tumor! ")
-                            if (DNA_t_cov >= DNA_t_cov_thres and DNA_t_altC >= DNA_t_altC_thres and DNA_t_af >= DNA_t_af_thres and DNA_t_altref_total >= DNA_t_percent_thres*DNA_t_cov):
+                            # if (DNA_t_cov >= DNA_t_cov_thres and DNA_t_altC >= DNA_t_altC_thres and DNA_t_af >= DNA_t_af_thres and DNA_t_altref_total >= DNA_t_percent_thres*DNA_t_cov):
+                            if (line['DNA_t_cov'] >= line['DNA_t_cov_thres'] and
+                                line['DNA_t_altC'] >= line['DNA_t_altC_thres'] and
+                                DNA_t_af >= DNA_t_af_thres and DNA_t_altref_total >= DNA_t_percent_thres*DNA_t_cov):
                                 writer.writerow(content)
                         else:
                             # logger.info("Both genome and transcriptome are sequenced for this tumor! ")
                             if ((DNA_t_cov >= DNA_t_cov_thres and DNA_t_altC >= DNA_t_altC_thres and DNA_t_af >= DNA_t_af_thres and DNA_t_altref_total >= DNA_t_percent_thres*DNA_t_cov) or
                                 (RNA_t_cov >= RNA_t_cov_thres and RNA_t_altC >= RNA_t_altC_thres and RNA_t_af >= RNA_t_af_thres and RNA_t_altref_total >= RNA_t_percent_thres*RNA_t_cov)):
                                 writer.writerow(content)
-                         
     return [filtered_summary, somatic_summary]
+
+def is_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def make_occurrence_dict(infile):
     gene_patients = {}
