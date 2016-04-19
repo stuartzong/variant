@@ -1,11 +1,14 @@
 #! /usr/bin/env python
 
+
 import os, stat, os.path, time, datetime, subprocess
 import re, sys, glob, argparse, csv, shutil, fileinput
 from collections import defaultdict
 from pprint import pprint
 from itertools import islice
 import ConfigParser
+
+print("this is zyxue's edits")
 
 def __main__():
     print "Quality and somatic filtering script starts at: %s\n" % datetime.datetime.now()     
