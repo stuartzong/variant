@@ -73,6 +73,23 @@ def somatic_filtering(variant_summary, thresholds, somatic_summary):
                     writer.writerow(content)
 
 
+def pass_somatic_filters_old(thresholds, line):
+    if line['in_strelka'] == 'in_strelka':
+        return True
+    elif (line['t_DNA_cov'] == 'na' and
+           (line['n_RNA_AF'] <= thresholds['RNA_n_af'] or
+            line['n_RNA_AltC'] <= thresholds['RNA_n_altC'])):
+          return True
+    elif (line['t_RNA_cov'] == 'na' and
+           (line['n_DNA_AF'] <= thresholds['DNA_n_af'] or
+            line['n_DNA_AltC'] <= thresholds['DNA_n_altC'])):
+           return True
+    elif ((line['n_RNA_AF'] <= thresholds['RNA_n_af'] or
+           line['n_RNA_AltC'] <= thresholds['RNA_n_altC']) and
+          (line['n_DNA_AF'] <= thresholds['DNA_n_af'] or
+           line['n_DNA_AltC'] <= thresholds['DNA_n_altC'])):
+           return True
+
 def pass_somatic_filters(thresholds, line):
     if line['in_strelka'] == 'in_strelka':
         return True
@@ -110,7 +127,7 @@ def quality_filtering(variant_summary, thresholds, filtered_summary):
                     writer.writerow(content)
 
 
-def pass_quality_filters(thresholds, line):
+def pass_quality_filters_old(thresholds, line):
     # pass_quality = False
     RNA_t_altref_total = line["t_RNA_RefC"] + line["t_RNA_AltC"]
     DNA_t_altref_total = line["t_DNA_RefC"] + line["t_DNA_AltC"]
@@ -143,6 +160,40 @@ def pass_quality_filters(thresholds, line):
                 line['t_RNA_AF'] >= thresholds['RNA_t_af'] and
                 RNA_t_altref_total >= thresholds['RNA_t_percent']*line['t_RNA_cov']):
                 return True
+
+
+def pass_quality_filters(thresholds, line):
+    # pass_quality = False
+    RNA_t_altref_total = line["t_RNA_RefC"] + line["t_RNA_AltC"]
+    DNA_t_altref_total = line["t_DNA_RefC"] + line["t_DNA_AltC"]
+    # keep all strelka calls
+    if line['in_strelka'] == 'in_strelka':
+        return True
+    # when only transcriptome is sequenced
+    elif (line['t_DNA_cov'] == 'na' and
+          line['t_RNA_cov'] >= thresholds['RNA_t_cov'] and
+          line['t_RNA_AltC'] >= thresholds['RNA_t_altC'] and
+          line['t_RNA_AF'] >= thresholds['RNA_t_af'] and
+          RNA_t_altref_total >= thresholds['RNA_t_percent']*line['t_RNA_cov']):
+        return True
+    # when only genome is sequenced
+    elif (line['t_RNA_cov'] == 'na' and
+          line['t_DNA_cov'] >= thresholds['DNA_t_cov'] and
+          line['t_DNA_AltC'] >= thresholds['DNA_t_altC'] and
+          line['t_DNA_AF'] >= thresholds['DNA_t_af'] and
+          DNA_t_altref_total >= thresholds['DNA_t_percent']*line['t_DNA_cov']):
+        return True
+    # when both genome and transcriptome are sequenced 
+    elif (line['t_DNA_cov'] >= thresholds['DNA_t_cov'] and
+          line['t_DNA_AltC'] >= thresholds['DNA_t_altC'] and
+          line['t_DNA_AF'] >= thresholds['DNA_t_af'] and
+          DNA_t_altref_total >= thresholds['DNA_t_percent']*line['t_DNA_cov']):
+        return True
+    elif (line['t_RNA_cov'] >= thresholds['RNA_t_cov'] and
+          line['t_RNA_AltC'] >= thresholds['RNA_t_altC'] and
+          line['t_RNA_AF'] >= thresholds['RNA_t_af'] and
+          RNA_t_altref_total >= thresholds['RNA_t_percent']*line['t_RNA_cov']):
+        return True
 
             
 def is_float(s):
@@ -243,48 +294,44 @@ def parse_args():
 
 
 def main():
-    logger.info("Quality and somatic filtering script starts at: %s\n" % datetime.datetime.now())
+    start = datetime.datetime.now()
+    logger.info("Quality and somatic filtering script starts at: %s" % start)
     args = parse_args()
-
     filtered_summary = '{0}.filtered.tmp'.format(
         os.path.splitext(args.input_file)[0])
     somatic_summary = '{0}.somatic.tmp'.format(
         os.path.splitext(filtered_summary)[0])
-
     thresholds = get_thresholds(args.quality_somatic_filters)
+    logger.info('Filtering variants based on quality filters!')
     quality_filtering(args.input_file, thresholds, filtered_summary)
-    if args.pairing == 'unpaired':
-        pass
-    elif args.pairing == 'paired': 
+    if args.pairing == 'paired':
+        logger.info('Filtering variants based on somatic filters!')
         somatic_filtering(filtered_summary, thresholds, somatic_summary)
-
     # recalculate occurrence for filtered summary
-    out = make_occurrence_dict(filtered_summary)
-
+    # out = make_occurrence_dict(filtered_summary)
     (gene_patients_occur,
      var_patients_occur,
-     gene_variants_occur) = out
-
+     gene_variants_occur) = make_occurrence_dict(filtered_summary)
+    logger.info('Recalculate filtered variant occurrence!')
     calculate_occurrence(filtered_summary,
                          gene_patients_occur,
                          var_patients_occur,
                          gene_variants_occur)
-
     # recalculate occurrence for somatic summary
     if (os.path.isfile(somatic_summary)):
-        out = make_occurrence_dict(somatic_summary)
-        
+        # out = make_occurrence_dict(somatic_summary)
         (gene_patients_occur,
          var_patients_occur,
-         gene_variants_occur) = out
+         gene_variants_occur) = make_occurrence_dict(somatic_summary)
+        logger.info('Recalculate somatic variant occurrence!')
         calculate_occurrence(somatic_summary,
                              gene_patients_occur,
                              var_patients_occur,
                              gene_variants_occur)
         os.remove(somatic_summary)
-
-    # remove intermediate files
-    # os.remove(filtered_summary)
+    os.remove(filtered_summary)
+    end = datetime.datetime.now()
+    logger.info("Quality and somatic filtering script ends at: %s\n" % end)
 
 
 if __name__ == '__main__':
