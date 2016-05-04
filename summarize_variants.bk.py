@@ -1573,7 +1573,7 @@ def __main__():
         print "-------------------------------------------------------------------------------"
         summarize_indels(patient_files_non, sum_indel_header, hm_indel_sum_non, impact_types)
         
-       
+        ''' 
         print "-------------------------------------------------------------------------------"
         print "Summarizing snvs in vcfs for tumours with matching normals!"
         print "-------------------------------------------------------------------------------"
@@ -1672,7 +1672,7 @@ def __main__():
         print "Deleting intermediate files!"
         extension=['adjusted.fisher', '.vcf', 'AFcounts.af']
         #delete_files_by_extension(extension)
-        
+        '''        
     print "Summarization scripts finished on: %s\n" % datetime.datetime.now()    
 
 if __name__ == '__main__':

@@ -21,6 +21,7 @@ from itertools import islice
 import operator
 import ConfigParser
 from collections import defaultdict
+from settings import SUM_SNV_HEADER
 
 
 from jinja2 import Environment, FileSystemLoader
@@ -162,8 +163,10 @@ def count_ref_alt_bases(snp_list, base_count_file, af_file):
    return afs
 
 
-def parse_vcf(vcf_file, caller, impacts, gene_pats, gene_variants, snv_pos, snv_list, patient_status):
-    logger.info("%s, Variant caller is: %s!\n " %  (vcf_file.split("/")[-1], caller))
+def parse_snv_vcf(vcf_file, caller, impacts, gene_pats, gene_variants,
+              snv_pos, snv_list, patient_status):
+    logger.info("Parsing %s, Variant caller is: %s! " %
+                (vcf_file.split("/")[-1], caller))
     with open(vcf_file,  'r') as fh:
         ## Following line is useful for testing the script
         #fh = [next(fh) for x in xrange(350)]
@@ -171,7 +174,9 @@ def parse_vcf(vcf_file, caller, impacts, gene_pats, gene_variants, snv_pos, snv_
             if (not line.startswith("#")):
                 sl = line.strip().split("\t")
                 Info = sl[7]
-                if (not Info.startswith("INDEL")) and ("EFF=" in Info) and any(x in Info for x in impacts):
+                if (not Info.startswith("INDEL") and
+                    "EFF=" in Info and
+                    any(x in Info for x in impacts)):
                     splitInfo = Info.split(";")
                     # get gmaf value
                     try:
@@ -200,19 +205,22 @@ def parse_vcf(vcf_file, caller, impacts, gene_pats, gene_variants, snv_pos, snv_
                                cosmic_id = snp_id_tmp
                            else:
                                cosmic_id = "not_in_cosmic64"
-                        selected_transcripts = [k for k in transcripts if any(x in k for x in impacts)]
+                        selected_transcripts = [k for k in transcripts
+                                                if any(x in k for x in impacts)]
                         # pick the first transcript to get the gene name
                         trans_details = selected_transcripts[0]
                         gene = trans_details.split("|")[5]
                         if (gene == ""):
                             gene = "INTERGENIC"
-                        # make gene -> patient dict to count how many patients have variant in this gene
+                        # make gene -> patient dict to count how many patients
+                        # have variant in this gene
                         try:
                            gene_pats[gene].append(patient_status)
                         except:
                            gene_pats[gene] = [patient_status]
                         details = ":".join([snp_id, cosmic_id, gmaf, trans_details, caller])
-                        # put all relevant info into a triple nested dictionary: gene -> snv -> patient -> details
+                        # put all relevant info into a triple nested dictionary:
+                        # gene -> snv -> patient -> details
                         try:
                            gene_variants[gene][snv][patient_status].append(details)
                         except:
@@ -238,7 +246,7 @@ def summarize_snvs(patient_files, sum_header_wn_tmp, hm_sum_wn_tmp, hm_impacts):
     patient_callers = dict()
     snv_pos_files = []
     for patient in patient_files:
-        logger.info("Start parsing all vcf files related to: %s" % patient)
+        logger.info("Parsing all vcf files related to: %s" % patient)
         snv_pos_file = ".".join([patient, "vcf.snp.pos"])
         snv_pos_files.append(snv_pos_file)
         snv_pos = []
@@ -258,7 +266,7 @@ def summarize_snvs(patient_files, sum_header_wn_tmp, hm_sum_wn_tmp, hm_impacts):
                             patient_callers[patient_status].append(caller)
                         except KeyError:
                             patient_callers[patient_status] = [caller]
-                        two_dicts = parse_vcf(vcf, caller, hm_impacts,
+                        two_dicts = parse_snv_vcf(vcf, caller, hm_impacts,
                                               hm_gene_dict, hm_variants_dict,
                                               snv_pos, snv_list, patient_status)
                         hm_gene_dict = two_dicts[0]
@@ -297,7 +305,7 @@ def write_summary(variants_dict, gene_dict, summary_file,
                                   i in patient_statuses_snv_level]
             num_patients_snv_level = len(patients_snv_level)
             snv_details = []
-            logger.info("patients_snv_level are: %s" % patients_snv_level)
+            # logger.info("patients_snv_level are: %s" % patients_snv_level)
             # all patient status combinations
             all_patient_statuses = []
             for pat in patients_snv_level:
@@ -308,9 +316,9 @@ def write_summary(variants_dict, gene_dict, summary_file,
             # print('bbbbbbbbb')
             patient_statuses_not_called = list(set(all_patient_statuses)-
                                                set(patient_statuses_snv_level))
-            logger.info("all_patient_statuses is %s, %s, %s, %s\n" %
-                        (gene, all_patient_statuses, patient_statuses_snv_level,
-                         patient_statuses_not_called))
+            # logger.info("all_patient_statuses is %s, %s, %s, %s" %
+            #             (gene, all_patient_statuses, patient_statuses_snv_level,
+            #              patient_statuses_not_called))
             for patient in variants_dict[gene][snv]:
                 chr, start, ref, alt = snv.split(':')
                 # anno_details: rs8473:COSM1128106:0.4748:NON_SYNONYMOUS_
@@ -419,7 +427,7 @@ def summarize_indels(patient_files, sum_header_wn_tmp,
         for status in patient_files[patient]:
             if ("normal" not in status):
                 status_vcfs = patient_files[patient][status]
-                logger.info("Parsing vcf related to %s and %s" %
+                logger.info("Parsing vcf related to %s %s" %
                             (patient, status))
                 strelka_indel_vcf = status_vcfs['strelka_indel_vcf']
                 DNA_single_vcf = status_vcfs['DNA_single_vcf']
@@ -428,9 +436,6 @@ def summarize_indels(patient_files, sum_header_wn_tmp,
                 #mutseq does not have indel result
                 # mutseq_snv_vcf = status_vcfs['mutseq_snv_vcf']
                 patient_status = "_".join([patient, status])
-
-                logger.info("Parsing vcf files related to: %s, %s" %
-                            (patient, status))
                 patient_status = "_".join([patient, status])
                 for key in status_vcfs:
                     # do not parse mutseq or strelka snv vcfs
@@ -548,65 +553,65 @@ def parse_strelka_indel(vcf_file, caller, impacts, gene_pats,
                 sl = line.strip().split("\t")
                 Info = sl[7]
                 if ("EFF=" in Info) and any(x in Info for x in impacts):
-                            # use tier1 counts, which is with mapping quality >40
-                            normal_info = sl[9].split(":")
-                            tumor_info = sl[10].split(":")
-                            splitInfo = Info.split(";")
-                            nor_cov =  normal_info[0]
-                            nor_refC = normal_info[2].split(",")[0]
-                            nor_indelC = normal_info[3].split(",")[0]
-                            tum_cov =  tumor_info[0]
-                            tum_refC = tumor_info[2].split(",")[0]
-                            tum_indelC = tumor_info[3].split(",")[0]
-                            #nor_adj_cov = int(nor_refC) + int(nor_indelC)
-                            #tum_adj_cov = int(tum_refC) + int(tum_indelC)
-                            nor_af = calculate_af (nor_cov, nor_refC, nor_indelC)
-                            tum_af = calculate_af (tum_cov, tum_refC, tum_indelC)
-                            mpileup_cov = ["na", "na", "na", "na"]
-                            strelka_cov = [nor_cov, nor_refC, nor_indelC,
-                                           str(nor_af), tum_cov, tum_refC,
-                                           tum_indelC, str(tum_af)]
-                            cov_info = "\t".join(mpileup_cov + strelka_cov)
-                            try:
-                                gmaf = [j for j in splitInfo if
-                                        j.startswith("GMAF=")][0].split("=")[1]
-                            except:
-                               gmaf = "gmaf_unknown"
-                            transcripts = [i for i in splitInfo if
-                                i.startswith("EFF=")][0].split("=")[1].split(",")
-                            rs_cos_id = sl[2]
-                            chr, start, ref = sl[0], sl[1], sl[3]
-                            alts = sl[4].split(",")
-                            for alt in alts:
-                                indel = ":".join([chr, start, ref, alt])
-                                snp_id_tmp = rs_cos_id.split(";")[0]
-                                if snp_id_tmp.startswith("rs"):
-                                   snp_id = snp_id_tmp
-                                else:
-                                   snp_id = "novel_snp"
-                                try:
-                                   cosmic_id = rs_cos_id.split(";")[1]
-                                except:
-                                   if snp_id_tmp.startswith("COS"):
-                                       cosmic_id = snp_id_tmp
-                                   else:
-                                       cosmic_id = "not_in_cosmic64"
-                                selected_transcripts = [k for k in transcripts
-                                                        if any(x in k for x in impacts)]
-                                trans_details = selected_transcripts[0]
-                                gene = trans_details.split("|")[5]
-                                if (gene == ""):
-                                    gene = "INTERGENIC"
-                                try:
-                                   gene_pats[gene].append(patient_status)
-                                except:
-                                   gene_pats[gene] = [patient_status]
-                                details = ":".join([snp_id, cosmic_id, gmaf,
-                                                    trans_details, cov_info, caller])
-                                try:
-                                   gene_variants[gene][indel][patient_status].append(details)
-                                except:
-                                   gene_variants[gene][indel][patient_status] = [details]
+                    # use tier1 counts, which is with mapping quality >40
+                    normal_info = sl[9].split(":")
+                    tumor_info = sl[10].split(":")
+                    splitInfo = Info.split(";")
+                    nor_cov =  normal_info[0]
+                    nor_refC = normal_info[2].split(",")[0]
+                    nor_indelC = normal_info[3].split(",")[0]
+                    tum_cov =  tumor_info[0]
+                    tum_refC = tumor_info[2].split(",")[0]
+                    tum_indelC = tumor_info[3].split(",")[0]
+                    #nor_adj_cov = int(nor_refC) + int(nor_indelC)
+                    #tum_adj_cov = int(tum_refC) + int(tum_indelC)
+                    nor_af = calculate_af (nor_cov, nor_refC, nor_indelC)
+                    tum_af = calculate_af (tum_cov, tum_refC, tum_indelC)
+                    mpileup_cov = ["na", "na", "na", "na"]
+                    strelka_cov = [nor_cov, nor_refC, nor_indelC,
+                                   str(nor_af), tum_cov, tum_refC,
+                                   tum_indelC, str(tum_af)]
+                    cov_info = "\t".join(mpileup_cov + strelka_cov)
+                    try:
+                        gmaf = [j for j in splitInfo if
+                                j.startswith("GMAF=")][0].split("=")[1]
+                    except:
+                       gmaf = "gmaf_unknown"
+                    transcripts = [i for i in splitInfo if
+                        i.startswith("EFF=")][0].split("=")[1].split(",")
+                    rs_cos_id = sl[2]
+                    chr, start, ref = sl[0], sl[1], sl[3]
+                    alts = sl[4].split(",")
+                    for alt in alts:
+                        indel = ":".join([chr, start, ref, alt])
+                        snp_id_tmp = rs_cos_id.split(";")[0]
+                        if snp_id_tmp.startswith("rs"):
+                           snp_id = snp_id_tmp
+                        else:
+                           snp_id = "novel_snp"
+                        try:
+                           cosmic_id = rs_cos_id.split(";")[1]
+                        except:
+                           if snp_id_tmp.startswith("COS"):
+                               cosmic_id = snp_id_tmp
+                           else:
+                               cosmic_id = "not_in_cosmic64"
+                        selected_transcripts = [k for k in transcripts
+                                                if any(x in k for x in impacts)]
+                        trans_details = selected_transcripts[0]
+                        gene = trans_details.split("|")[5]
+                        if (gene == ""):
+                            gene = "INTERGENIC"
+                        try:
+                           gene_pats[gene].append(patient_status)
+                        except:
+                           gene_pats[gene] = [patient_status]
+                        details = ":".join([snp_id, cosmic_id, gmaf,
+                                            trans_details, cov_info, caller])
+                        try:
+                           gene_variants[gene][indel][patient_status].append(details)
+                        except:
+                           gene_variants[gene][indel][patient_status] = [details]
     return [gene_pats, gene_variants]
 
 
@@ -616,13 +621,14 @@ def write_indel_summary(variants_dict, gene_dict, summary_file,
     writer = open(summary_file, 'w')
     writer.write("\t".join(sum_header_wn_tmp))
     writer.write("\n")
-    logger.info("Start writing variants_dict into a summary file: %s\n" % summary_file)
+    logger.info("Writing variants_dict into %s" % summary_file)
     for gene in variants_dict:
         short_patient = [i.split("_")[0] for i in gene_dict[gene]]
         num_patients_gene_level = len(list(set(short_patient)))
         numSNVs = len(variants_dict[gene].keys())
         for snv in variants_dict[gene]:
-            patients_snv_level = [i.split("_")[0] for i in variants_dict[gene][snv]]
+            patients_snv_level = [i.split("_")[0] for i in
+                                  variants_dict[gene][snv]]
             num_patients_SNV_level = len(list(set(patients_snv_level)))
             snv_details = []
             for patient in variants_dict[gene][snv]:
@@ -637,9 +643,10 @@ def write_indel_summary(variants_dict, gene_dict, summary_file,
                                     if "strelka" in i][0].split(":")
                 else:
                     callers = [i.split(":")[-1] for i in anno_details_all]
-                    # pick highest coverage if called both in DNA and RNA
+                    # pick highest ref+alt if called both in DNA and RNA
                     multi_cov = [i.split(':')[4] for i in anno_details_all]
-                    multi_ref_alt= [int(i.split('\t')[1]) + int(i.split('\t')[2])
+                    multi_ref_alt= [int(i.split('\t')[1]) +
+                                    int(i.split('\t')[2])
                                     for i in multi_cov]
                     index, value = max(enumerate(multi_ref_alt),
                                        key=operator.itemgetter(1))
@@ -651,13 +658,16 @@ def write_indel_summary(variants_dict, gene_dict, summary_file,
                     (in_paired_mpileup,
                      in_mutseq, in_strelka,
                      in_DNA_single_mpileup,
-                     in_RNA_single_mpileup) = determine_callers(callers_run, callers)
+                     in_RNA_single_mpileup) = determine_callers(callers_run,
+                                                                callers)
                     content = "\t".join([gene, str(num_patients_gene_level),
                                          str(numSNVs), chr, start, ref, alt,
                                          str(num_patients_SNV_level), patient,
                                          rs_id, gmaf, cosmic_id, snp_eff,
-                                         in_DNA_single_mpileup, in_paired_mpileup,
-                                         in_strelka, in_RNA_single_mpileup, cov_info])
+                                         in_DNA_single_mpileup,
+                                         in_paired_mpileup,
+                                         in_strelka, in_RNA_single_mpileup,
+                                         cov_info])
 
                     writer.write(content)
                     writer.write("\n")
@@ -806,9 +816,9 @@ def qsub_scripts(scripts):
     """ qsub scripts """
     wkdir = os.getcwd()
     for script in scripts:
-        #p = subprocess.Popen('qsub %s' % script,  shell=True, stdout=subprocess.PIPE)
         p = subprocess.Popen('ssh m0001 \"cd %s;  qsub %s\"' %
-                             (wkdir, script),  shell=True, stdout=subprocess.PIPE)
+                             (wkdir, script),  shell=True,
+                             stdout=subprocess.PIPE)
         output,  err = p.communicate()
 
 
@@ -836,11 +846,15 @@ def parse_pileup_output(patient_files, patient_snv_wn, patient_snv_non):
             for type in bam_types:
                 if (bam_types[type] != "NA"):
                     #for type in data_types:
-                    base_count_file  = ".".join([patient, status, type, "pileup.AFcounts"])
-                    af_file = ".".join([patient, status, type, "pileup.AFcounts.af"])
+                    base_count_file  = ".".join([patient, status,
+                                                 type, "pileup.AFcounts"])
+                    af_file = ".".join([patient, status,
+                                        type, "pileup.AFcounts.af"])
                     af_files[type].append( af_file )
                     # variant bp count dict for primary, relapse, and normal
-                    af_dict  = count_ref_alt_bases(snp_list, base_count_file, af_file)
+                    af_dict  = count_ref_alt_bases(snp_list,
+                                                   base_count_file,
+                                                   af_file)
                     # '5:131892979:G': ['G:88:1:1:0.01']
                     try:
                         #logger.info(patient, status)
@@ -865,9 +879,10 @@ def parse_pileup_output(patient_files, patient_snv_wn, patient_snv_non):
                     bam_key = "_".join([type, "bam"])
                     t_bam = patient_files[patient][status][bam_key]
                     if (not status == "normal") and (t_bam != "NA"):
-                        #logger.info("patient, status, bam_key, type are:", patient, status, bam_key, type)
-                        logger.info("merging %s %s %s with its corresponding normal!" % (patient, status, type))
-                        com_af_file = ".".join([patient, status, type, "af.combined"])
+                        logger.info("merging %s %s %s with its normal!" %
+                                    (patient, status, type))
+                        com_af_file = ".".join([patient, status,
+                                                type, "af.combined"])
                         com_af_files[type].append(com_af_file)
                         t_af_dict = af_dicts[type][patient][status]
                         with open(com_af_file,  'wb') as opf:
@@ -881,28 +896,31 @@ def parse_pileup_output(patient_files, patient_snv_wn, patient_snv_non):
                                if ("no_matched_normal" not in n_af_dict):
                                    try:
                                        normal_afs = n_af_dict[af_key]
-                                       normal_af = [i for i in normal_afs if i[0] == alt][0].split(":")
-                                       #logger.info("normal_af is: %s, %s " % (type(normal_af), normal_af))
+                                       normal_af = [i for i in normal_afs
+                                                    if i[0] == alt][0].split(":")
                                    except KeyError:
                                        normal_af = ["N", "0", "0", "0", "0"]
-                                       #logger.info("normal KEYERROR! %s \n" % normal_af)
                                else:
                                    alt_tag = "_".join(["no", type, "normal"])
                                    normal_af = [alt_tag, "0", "0", "0", "0"]
-                               n_totC, n_refC, n_altC, n_af = normal_af[1], normal_af[2], normal_af[3], normal_af[4]
+                               n_totC, n_refC, n_altC, n_af = normal_af[1:5]
                                try:
                                    tumour_afs = t_af_dict[af_key]
-                                   tumour_af = [i for i in tumour_afs if i[0] == alt][0].split(":")
+                                   tumour_af = [i for i in tumour_afs if
+                                                i[0] == alt][0].split(":")
                                except KeyError:
                                    tumour_af = ["N", "0", "0", "0", "0"]
-                                   #logger.info("tumour KEYERROR! %s\n" % tumour_af)
-                               t_totC, t_refC, t_altC, t_af = tumour_af[1], tumour_af[2], tumour_af[3], tumour_af[4]
+                               t_totC, t_refC, t_altC, t_af = tumour_af[1:5]
                                t_alt = tumour_af[0]
-                               writer.writerow([chr, start, ref, alt, n_totC, n_refC, n_altC, n_af, t_alt, t_totC, t_refC, t_altC, t_af])
+                               writer.writerow([chr, start, ref, alt,
+                                                n_totC, n_refC, n_altC, n_af,
+                                                t_alt,
+                                                t_totC, t_refC, t_altC, t_af])
             else:
                 n_af_dict = dict()
                 n_af_dict["no_matched_normal"] = "True"
-                logger.info("%s %s normal bam does not exist, merging not required!" % (patient, type))
+                logger.info("no %s %s normal bam, merging not required!" %
+                            (patient, type))
     return com_af_files
 
 
@@ -1010,9 +1028,11 @@ def make_af_dict(patient_files):
                 for status in patient_files[patient]:
                     #bam = patient_files[patient][status][bam_key]
                     if (not status == "normal"): #and (bam != "NA"):
-                        aff  = ".".join([patient, status, type, "af.combined.adjusted.fisher"])
+                        aff  = ".".join([patient, status,
+                                         type, "af.combined.adjusted.fisher"])
                         affs_wn.append(aff)
-                        AFcounts_af  = ".".join([patient, status, type, "pileup.AFcounts.af"])
+                        AFcounts_af  = ".".join([patient, status,
+                                                 type, "pileup.AFcounts.af"])
                         AFcounts_afs_wn[type].append( AFcounts_af )
             elif (nor_bam == "NA"):
                 logger.info("%s does not have %s normal bam!" % (patient, type))
@@ -1020,7 +1040,8 @@ def make_af_dict(patient_files):
                     bam = patient_files[patient][status][bam_key]
                     #if (bam != "NA"):
                     if (not status == "normal") and (bam != "NA"):
-                        aff  = ".".join([patient, status, type, "pileup.AFcounts.af"])
+                        aff  = ".".join([patient, status,
+                                         type, "pileup.AFcounts.af"])
                         affs_non.append( aff )
         logger.info("%s no normal af files are: %s" % (type, affs_non))
         logger.info("%s with normal af files are: %s" % (type, affs_wn))
@@ -1032,106 +1053,120 @@ def make_af_dict(patient_files):
     return [af_dicts, AFcounts_afs_wn]
 
 
-def combine_sum_af_anno(pairing_status, snv_sum, snv_sum_tmp, DNA_af_wn_dict, RNA_af_wn_dict,
-                            DNA_af_non_dict, RNA_af_non_dict, patient_files, sum_header):
+def add_af_anno_for_unpaired(snv_sum, snv_sum_tmp,
+                             DNA_af_wn_dict, RNA_af_wn_dict,
+                             DNA_af_non_dict, RNA_af_non_dict,
+                             patient_files, sum_header):
+    with open(snv_sum,  'wb') as csvfile:
+        writer = csv.writer(csvfile, delimiter='\t')
+        writer.writerow(sum_header)
+        no_coverage = ["0", "0", "0", "0"]
+        no_bam = ["na", "na", "na", "na"]
+        with open(snv_sum_tmp,  'r') as snv_fh:
+            records = csv.DictReader(snv_fh,  delimiter='\t')
+            header = records.fieldnames
+            for line in records:
+                line_content = [line[i] for i in header ]
+                sl = line['patient_ID'].split("_")
+                patient = sl[0]
+                status = '_'.join(sl[1:])
+                DNA_bam = patient_files[patient][status]['DNA_bam']
+                RNA_bam = patient_files[patient][status]['RNA_bam']
+                DNA_tc = patient_files[patient][status]['DNA_tc']
+                RNA_tc = patient_files[patient][status]['RNA_tc']
+                variant = "_".join([patient_id, chr, pos, ref, alt])
+                variant = "_".join([line['patient_ID'],
+                                    line['chromosome'],
+                                    line['position'],
+                                    line['ref_base'],
+                                    line['alt_base']])
+                # DNA af info
+                try:
+                    DNA_af = DNA_af_non_dict[variant][0].split(',')
+                except KeyError:
+                    if (DNA_bam == "NA"):
+                        DNA_af = no_bam
+                    else:
+                        DNA_af = no_coverage 
+                # RNA af info
+                try:
+                    RNA_af = RNA_af_non_dict[variant][0].split(',')
+                except KeyError:
+                    if (RNA_bam == "NA"):
+                        RNA_af = no_bam
+                    else:
+                        RNA_af = no_coverage
+                final_content = line_content + DNA_af + [DNA_tc] + RNA_af + [RNA_tc]
+                writer.writerow(final_content)
+
+
+def add_af_anno_for_paired(snv_sum, snv_sum_tmp,
+                           DNA_af_wn_dict, RNA_af_wn_dict,
+                           DNA_af_non_dict, RNA_af_non_dict,
+                           patient_files, sum_header):
+    no_bam = ["na", "na", "na", "na" ,"na", "na", "na",
+              "na", "na", "na", "na", "na", "na"]
+    no_coverage = ["0", "0", "0", "0" ,"0", "0", "0",
+                   "0", "0", "0", "0", "0", "0"]
+    nas = ["na", "na", "na", "na"]
+    zeros = ["0", "0", "0", "0"]
     with open(snv_sum,  'wb') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
         writer.writerow(sum_header)
         with open(snv_sum_tmp,  'r') as snv_fh:
             records = csv.DictReader(snv_fh,  delimiter='\t')
             header = records.fieldnames
-            if (pairing_status == "unpaired"):
-                for line in records:
-                    line_content = [line[i] for i in header ]
-                    patient_id = line['patient_ID']
-                    gene = line['gene']
-                    chr = line['chromosome']
-                    pos = line['position']
-                    ref = line['ref_base']
-                    alt = line['alt_base']
-                    sl = patient_id.split("_")
-                    patient = sl[0]
-                    status = '_'.join(sl[1:])
-                    DNA_bam = patient_files[patient][status]['DNA_bam']
-                    RNA_bam = patient_files[patient][status]['RNA_bam']
-                    DNA_tc = patient_files[patient][status]['DNA_tc']
-                    RNA_tc = patient_files[patient][status]['RNA_tc']
-                    variant = "_".join([patient_id, chr, pos, ref, alt])
-                    # DNA af info
+            for line in records:
+                line_content = [line[i] for i in header ]
+                sl = line['patient_ID'].split("_")
+                patient = sl[0]
+                status = '_'.join(sl[1:])
+                n_DNA_bam = patient_files[patient]['normal']['DNA_bam']
+                n_RNA_bam = patient_files[patient]['normal']['RNA_bam']
+                DNA_bam = patient_files[patient][status]['DNA_bam']
+                RNA_bam = patient_files[patient][status]['RNA_bam']
+                DNA_tc = patient_files[patient][status]['DNA_tc']
+                RNA_tc = patient_files[patient][status]['RNA_tc']
+                variant = "_".join([line['patient_ID'],
+                                    line['chromosome'],
+                                    line['position'],
+                                    line['ref_base'],
+                                    line['alt_base']])
+                # DNA af info
+                if (n_DNA_bam != "NA"):
                     try:
-                        DNA_af = DNA_af_non_dict[variant][0].split(',')
+                        DNA_af = DNA_af_wn_dict[variant][0].split(',')
                     except KeyError:
-                        if (DNA_bam == "NA"):
-                            DNA_af = ["na", "na", "na", "na"]
+                        if (DNA_bam != "NA"):
+                            DNA_af = no_coverage
                         else:
-                            DNA_af = ["0", "0", "0", "0"]
-                    # RNA af info
+                            DNA_af = no_bam
+                elif (n_DNA_bam == "NA"):
                     try:
-                        RNA_af = RNA_af_non_dict[variant][0].split(',')
+                        DNA_af_tmp = DNA_af_non_dict[variant][0].split(',')
+                        DNA_af = nas + DNA_af_tmp + nas + ["na"]
                     except KeyError:
-                        if (RNA_bam == "NA"):
-                            RNA_af = ["na", "na", "na", "na"]
+                        if (DNA_bam != "NA"):
+                            DNA_af = nas + zeros + nas + ["na"]
                         else:
-                            RNA_af = ["0", "0", "0", "0"]
-                    final_content = line_content + DNA_af + [DNA_tc] + RNA_af + [RNA_tc]
-                    writer.writerow(final_content)
-            elif (pairing_status == "paired"):
-                 for line in records:
-                     line_content = [line[i] for i in header ]
-                     patient_id = line['patient_ID']
-                     gene = line['gene']
-                     chr = line['chromosome']
-                     pos = line['position']
-                     ref = line['ref_base']
-                     alt = line['alt_base']
-                     sl = patient_id.split("_")
-                     patient = sl[0]
-                     status = '_'.join(sl[1:])
-                     n_DNA_bam = patient_files[patient]['normal']['DNA_bam']
-                     n_RNA_bam = patient_files[patient]['normal']['RNA_bam']
-                     DNA_bam = patient_files[patient][status]['DNA_bam']
-                     RNA_bam = patient_files[patient][status]['RNA_bam']
-                     DNA_tc = patient_files[patient][status]['DNA_tc']
-                     RNA_tc = patient_files[patient][status]['RNA_tc']
-                     variant = "_".join([patient_id, chr, pos, ref, alt])
-                     # DNA af info
-                     if (n_DNA_bam != "NA"):
-                         try:
-                             DNA_af = DNA_af_wn_dict[variant][0].split(',')
-                         except KeyError:
-                             if (DNA_bam != "NA"):
-                                 DNA_af = ["0", "0", "0", "0" ,"0", "0", "0", "0", "0", "0", "0", "0", "0"]
-                             else:
-                                 DNA_af = ["na", "na", "na", "na" ,"na", "na", "na", "na", "na", "na", "na", "na", "na"]
-                     elif (n_DNA_bam == "NA"):
-                         try:
-                             DNA_af_tmp = DNA_af_non_dict[variant][0].split(',')
-                             na = ["na", "na", "na", "na" ]
-                             DNA_af = na + DNA_af_tmp + na + ["na"]
-                         except KeyError:
-                             if (DNA_bam != "NA"):
-                                 DNA_af = ["na", "na", "na", "na" ,"0", "0", "0", "0", "na", "na", "na", "na", "na"]
-                             else:
-                                 DNA_af = ["na", "na", "na", "na" ,"na", "na", "na", "na", "na", "na", "na", "na", "na"]
-                     # RNA af info
-                     if (n_RNA_bam != "NA"):
-                         try:
-                             RNA_af = RNA_af_wn_dict[variant][0].split(',')
-                         except KeyError:
-                             RNA_af = ["0", "0", "0", "0" ,"0", "0", "0", "0", "0", "0", "0", "0", "0"]
-                     elif (n_RNA_bam == "NA"):
-                         try:
-                             RNA_af_tmp = RNA_af_non_dict[variant][0].split(',')
-                             na = ["na", "na", "na", "na" ]
-                             RNA_af = na + RNA_af_tmp + na + ["na"]
-
-                         except KeyError:
-                             if (RNA_bam != "NA"):
-                                 RNA_af = ["na", "na", "na", "na" ,"0", "0", "0", "0", "na", "na", "na", "na", "na"]
-                             else:
-                                 RNA_af = ["na", "na", "na", "na" ,"na", "na", "na", "na", "na", "na", "na", "na", "na"]
-                     final_content = line_content + DNA_af + [DNA_tc] + RNA_af + [RNA_tc]
-                     writer.writerow(final_content)
+                            DNA_af = no_bam
+                # RNA af info
+                if (n_RNA_bam != "NA"):
+                    try:
+                        RNA_af = RNA_af_wn_dict[variant][0].split(',')
+                    except KeyError:
+                        RNA_af = no_coverage
+                elif (n_RNA_bam == "NA"):
+                    try:
+                        RNA_af_tmp = RNA_af_non_dict[variant][0].split(',')
+                        RNA_af = nas + RNA_af_tmp + nas + ["na"]
+                    except KeyError:
+                        if (RNA_bam != "NA"):
+                            RNA_af = nas + zeros + nas + ["na"]
+                        else:
+                            RNA_af = no_bam
+                final_content = line_content + DNA_af + [DNA_tc] + RNA_af + [RNA_tc]
+                writer.writerow(final_content)
 
 
 def group_patients(patient_files):
@@ -1201,8 +1236,10 @@ def check_file_permission(patient_files):
 
 def __main__():
     parser = argparse.ArgumentParser(description='Summarize variants at both gene and variant level')
-    parser.add_argument('-d','--data_type', help='specify data type as wgs or spc', required=True)
-    parser.add_argument('-i','--input_file', help='specify input file, which has file paths in it', required=True)
+    parser.add_argument('-d','--data_type', required=True,
+                        help='specify data type as wgs or spc')
+    parser.add_argument('-i','--input_file', required=True,
+                        help='specify input file, which tells vcf, bam paths')
     args = vars(parser.parse_args())
     logger.debug('some debug message')
     logger.info('some info message')
@@ -1210,7 +1247,6 @@ def __main__():
     logger.error('some error message')
     logger.critical('some critical message')
     logger.info("Gene summary scripts starts at: %s\n" % datetime.datetime.now())
-    # input_file = "bam_vcf_cnv_path.txt"
     input_file = args['input_file']
     # impact_types as annotated by snpeff
     impact_types = ["HIGH", "MODERATE"]
@@ -1224,30 +1260,31 @@ def __main__():
     hm_snv_sum_non_tmp = ".".join([hm_snv_sum_non, "tmp"])
     hm_indel_sum_wn = "high_moderate_INDEL_summary_with_normal.txt"
     hm_indel_sum_non = "high_moderate_INDEL_summary_no_normal.txt"
-    sum_snv_header = ["gene",  "num_patients_gene_level", "num_SNVs_gene_level",
-                      "chromosome", "position", "ref_base", "alt_base",
-                      "num_patients_SNV_level", "patient_ID", "snp_ID", "gmaf",
-                      "cosmic64_ID", "snpeff_details", "in_DNA_single_mpileup", "in_paired_mpileup",
-                      "in_mutseq", "in_strelka", "in_RNA_single_mpileup"]
+    sum_snv_header = SUM_SNV_HEADER
 
-    sum_snv_header_non = sum_snv_header + ["t_DNA_cov", "t_DNA_RefC", "t_DNA_AltC", "t_DNA_AF", "DNA_tc",
-                                           "t_RNA_cov", "t_RNA_RefC", "t_RNA_AltC", "t_RNA_AF", "RNA_tc"]
-    sum_snv_header_wn = sum_snv_header + ["n_DNA_cov", "n_DNA_RefC", "n_DNA_AltC", "n_DNA_AF",
-                                          "t_DNA_cov", "t_DNA_RefC", "t_DNA_AltC", "t_DNA_AF",
-                                          "adj_t_DNA_cov", "adj_t_DNA_RefC", "adj_t_DNA_AltC", "adj_t_DNA_AF",
-                                          "DNA_fisher_pvalue", "DNA_tc",
-                                          "n_RNA_cov", "n_RNA_RefC", "n_RNA_AltC", "n_RNA_AF",
-                                          "t_RNA_cov", "t_RNA_RefC", "t_RNA_AltC", "t_RNA_AF",
-                                          "adj_t_RNA_cov", "adj_t_RNA_RefC", "adj_t_RNA_AltC", "adj_t_RNA_AF",
-                                          "RNA_fisher_pvalue", "RNA_tc"]
+    sum_snv_header_non = (sum_snv_header +
+                          ["t_DNA_cov", "t_DNA_RefC", "t_DNA_AltC", "t_DNA_AF",
+                           "DNA_tc", "t_RNA_cov", "t_RNA_RefC", "t_RNA_AltC",
+                           "t_RNA_AF", "RNA_tc"])
+    sum_snv_header_wn = (sum_snv_header +
+                         ["n_DNA_cov", "n_DNA_RefC", "n_DNA_AltC", "n_DNA_AF",
+                          "t_DNA_cov", "t_DNA_RefC", "t_DNA_AltC", "t_DNA_AF",
+                          "adj_t_DNA_cov", "adj_t_DNA_RefC", "adj_t_DNA_AltC",
+                          "adj_t_DNA_AF", "DNA_fisher_pvalue", "DNA_tc",
+                          "n_RNA_cov", "n_RNA_RefC", "n_RNA_AltC", "n_RNA_AF",
+                          "t_RNA_cov", "t_RNA_RefC", "t_RNA_AltC", "t_RNA_AF",
+                          "adj_t_RNA_cov", "adj_t_RNA_RefC", "adj_t_RNA_AltC",
+                          "adj_t_RNA_AF", "RNA_fisher_pvalue", "RNA_tc"])
     sum_indel_header = ["gene",  "num_patients_gene_level", "num_INDELs_gene_level",
                         "chromosome", "position", "ref_base", "alt_base",
                         "num_patients_INDEL_level", "patient_ID", "snp_ID", "gmaf",
-                        "cosmic64_ID", "snpeff_details", "in_DNA_single_mpileup","in_paired_mpileup",  "in_strelka", "pileup_cov",
+                        "cosmic64_ID", "snpeff_details", "in_DNA_single_mpileup",
+                        "in_paired_mpileup",  "in_strelka", "pileup_cov",
                         "pileup_RefC", "pileup_AltC", "pileup_AF",
-                        "strelka_n_Cov", "strelka_n_RefC", "strelka_n_AltC", "strelka_n_AF",
-                        "strelka_t_Cov", "strelka_t_RefC", "strelka_t_AltC", "strelka_t_AF"]
-    logger.info("Removing completion stamps so that the pipeline can be initiated!\n")
+                        "strelka_n_Cov", "strelka_n_RefC", "strelka_n_AltC",
+                        "strelka_n_AF", "strelka_t_Cov", "strelka_t_RefC",
+                        "strelka_t_AltC", "strelka_t_AF"]
+    logger.info("Removing completion stamps to initialize the pipeline!")
     extension = ['intersect.complete', 'pileup.complete']
     delete_files_by_extension(extension)
     logger.info("Variant input file is: %s" % (input_file))
@@ -1263,46 +1300,55 @@ def __main__():
     logger.info("Checking bam, vcf file permissions!")
     check_file_permission(patient_files)
     if args['data_type'] == 'wgs':
-        logger.info("Summarizing indels in vcfs for tumours with matching normals!\n")
-        summarize_indels(patient_files_wn, sum_indel_header, hm_indel_sum_wn, impact_types)
-        logger.info("Summarizing indels in vcfs for tumours without normals!\n")
-        summarize_indels(patient_files_non, sum_indel_header, hm_indel_sum_non, impact_types)
-        logger.info("Summarizing snvs in vcfs for tumours with matching normals!")
-        sum_out_wn = summarize_snvs(patient_files_wn, sum_snv_header, hm_snv_sum_wn_tmp, impact_types)
-        patient_snv_wn = sum_out_wn[0]
-        pos_files_wn = sum_out_wn[1]
-        logger.info("Summarizing snvs in vcfs for tumours without matching_normal!")
-        sum_out_non = summarize_snvs(patient_files_non, sum_snv_header, hm_snv_sum_non_tmp, impact_types)
-        patient_snv_non = sum_out_non[0]
-        pos_files_non = sum_out_non[1]
-        logger.info("Generating mpileup scripts!\n")
-        out = make_pileup_scripts(patient_files)
-        pileup_scripts = out[0]
-        pileup_complete_stamps = out[1]
-        logger.info(pileup_scripts)
-                 #logger.info(pileup_complete_stamps)
-        logger.info("Qsub mpileup scripts!\n")
+        logger.info("Summarizing indels for tumours with matching normals!")
+        summarize_indels(patient_files_wn,
+                         sum_indel_header,
+                         hm_indel_sum_wn,
+                         impact_types)
+        logger.info("Summarizing indels for tumours without normals!")
+        summarize_indels(patient_files_non,
+                         sum_indel_header,
+                         hm_indel_sum_non,
+                         impact_types)
+        logger.info("Summarizing snvs for tumours with matching normals!")
+        (patient_snv_wn,
+         pos_files_wn) = summarize_snvs(patient_files_wn,
+                                        sum_snv_header,
+                                        hm_snv_sum_wn_tmp,
+                                        impact_types)
+        logger.info("Summarizing snvs for tumours without matching_normal!")
+        (patient_snv_non,
+         pos_files_non) = summarize_snvs(patient_files_non,
+                                         sum_snv_header,
+                                         hm_snv_sum_non_tmp,
+                                         impact_types)
+        logger.info("Generating mpileup scripts!")
+        (pileup_scripts,
+         pileup_complete_stamps) = make_pileup_scripts(patient_files)
+        logger.info("Qsub mpileup scripts!")
         qsub_scripts(pileup_scripts)
-        logger.info("Detecting if pileup jobs on cluster finised!\n")
+        logger.info("Detecting if pileup jobs on cluster finised!")
         detect_cluster_jobs(pileup_complete_stamps)
-        logger.info("Deleting intermediate files! \n")
+        logger.info("Deleting intermediate files!")
         #delete_files(pileup_scripts)
         #delete_files (pos_files_non)
         #delete_files (pos_files_wn)
-        logger.info("Parsing pileup output to get base counts!\n")
-        com_af_files = parse_pileup_output(patient_files, patient_snv_wn, patient_snv_non)
-        logger.info("com_af_files are:")
-        logger.info((com_af_files))
-        logger.info("Adjusting tumour base count by tumour content!\n")
+        logger.info("Parsing pileup output to get base counts!")
+        com_af_files = parse_pileup_output(patient_files,
+                                           patient_snv_wn,
+                                           patient_snv_non)
+        logger.info("Adjusting tumour base count by tumour content!")
         for type in com_af_files:
-            adjust_allele_frequency(type, com_af_files[type], patient_files)
-        logger.info("Performing Fisher Exact Test for tumour/normal pairs!\n")
+            adjust_allele_frequency(type,
+                                    com_af_files[type],
+                                    patient_files)
+        logger.info("Performing Fisher Exact Test for tumour/normal pairs!")
         run_fisher_exact_test(Rscript_path, r_script)
         logger.info("Deleting intermediate files!" )
         extension=['combined.adjusted', 'combined', '.pileup.log']
         #delete_files_by_extension(extension)
         logger.info("Figuring out if DNA and/or RNA bams available!\n")
-        logger.info("Reading in DNA and RNA af files and making af dictionary! \n")
+        logger.info("Reading in DNA and RNA af files and making af dictionary!")
         af_out = make_af_dict(patient_files)
         DNA_af_wn_dict = af_out[0]["DNA"][0]
         DNA_af_non_dict = af_out[0]["DNA"][1]
@@ -1310,20 +1356,34 @@ def __main__():
         RNA_af_non_dict = af_out[0]["RNA"][1]
         DNA_AFcounts_afs_wn = af_out[1]["DNA"]
         RNA_AFcounts_afs_wn = af_out[1]["RNA"]
-        logger.info("Deleting AFcounts.af files!\n")
+        logger.info("Deleting AFcounts.af files!")
         #delete_files(AFcounts_afs_wn)
-        logger.info("Combining snv_non summary, af, and annotation results!\n")
-        pairing_status = 'unpaired'
-        combine_sum_af_anno(pairing_status, hm_snv_sum_non, hm_snv_sum_non_tmp, DNA_af_wn_dict, RNA_af_wn_dict,
-                            DNA_af_non_dict, RNA_af_non_dict, patient_files, sum_snv_header_non)
-        logger.info("Combining snv_wn summary, af, and annotation results!\n")
-        pairing_status = 'paired'
-        combine_sum_af_anno(pairing_status, hm_snv_sum_wn, hm_snv_sum_wn_tmp, DNA_af_wn_dict, RNA_af_wn_dict,
-                            DNA_af_non_dict, RNA_af_non_dict, patient_files, sum_snv_header_wn)
+        if pairing_status == 'unpaired':
+            logger.info("Combining snv_non summary, af, and annotation results!")
+            add_af_anno_for_unpaired(hm_snv_sum_non,
+                                     hm_snv_sum_non_tmp,
+                                     DNA_af_wn_dict,
+                                     RNA_af_wn_dict,
+                                     DNA_af_non_dict,
+                                     RNA_af_non_dict,
+                                     patient_files,
+                                     sum_snv_header_non)
+        
+        elif pairing_status == 'paired':
+            logger.info("Combining snv_wn summary, af, and annotation results!")
+            add_af_anno_for_paired(hm_snv_sum_wn,
+                                   hm_snv_sum_wn_tmp,
+                                   DNA_af_wn_dict,
+                                   RNA_af_wn_dict,
+                                   DNA_af_non_dict,
+                                   RNA_af_non_dict,
+                                   patient_files,
+                                   sum_snv_header_wn)
         logger.info("Deleting intermediate files!")
         extension=['adjusted.fisher', '.vcf', 'AFcounts.af']
         #delete_files_by_extension(extension)
-    logger.info("Summarization scripts finished on: %s\n" % datetime.datetime.now())
+    logger.info("Summarization scripts finished on: %s" %
+                datetime.datetime.now())
 
 
 if __name__ == '__main__':
